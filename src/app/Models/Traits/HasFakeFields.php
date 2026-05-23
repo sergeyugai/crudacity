@@ -26,8 +26,12 @@ trait HasFakeFields
 
             $column_contents = $this->{$column};
 
-            if ($this->shouldDecodeFake($column)) {
-                $column_contents = json_decode($column_contents);
+            if ($this->shouldDecodeFake($column) || is_string($column_contents)) {
+                $decoded_column_contents = json_decode($column_contents);
+
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $column_contents = $decoded_column_contents;
+                }
             }
 
             if (is_array($column_contents) || is_object($column_contents) || $column_contents instanceof Traversable) {

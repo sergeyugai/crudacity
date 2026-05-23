@@ -3,11 +3,14 @@
 namespace Backpack\CRUD;
 
 use Backpack\CRUD\app\Http\Middleware\ThrottlePasswordRecovery;
+use Backpack\CRUD\app\Library\Assets\AssetManager;
 use Backpack\CRUD\app\Library\CrudPanel\CrudPanel;
 use Backpack\CRUD\app\Library\Database\DatabaseSchema;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Collection;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
+use Illuminate\View\Compilers\BladeCompiler;
 
 class BackpackServiceProvider extends ServiceProvider
 {
@@ -82,11 +85,50 @@ class BackpackServiceProvider extends ServiceProvider
             return new Collection();
         });
 
+        // Bind the asset manager object to Laravel's service container
+        $this->app->singleton('assets', function ($app) {
+            return new AssetManager();
+        });
+
+        $this->registerAssetBladeDirectives();
+
         // register the helper functions
         $this->loadHelpers();
 
         // register the artisan commands
         $this->commands($this->commands);
+    }
+
+    protected function registerAssetBladeDirectives()
+    {
+        $this->callAfterResolving('blade.compiler', function (BladeCompiler $bladeCompiler) {
+            $bladeCompiler->directive('loadStyleOnce', function ($parameter) {
+                return "<?php Assets::echoCss({$parameter}); ?>";
+            });
+
+            $bladeCompiler->directive('loadScriptOnce', function ($parameter) {
+                return "<?php Assets::echoJs({$parameter}); ?>";
+            });
+
+            $bladeCompiler->directive('loadOnce', function ($parameter) {
+                $cleanParameter = Str::of($parameter)->trim("'")->trim('"')->trim('`');
+                $filePath = Str::of($cleanParameter)->before('?')->before('#');
+
+                if (substr($filePath, -3) == '.js') {
+                    return "<?php Assets::echoJs({$parameter}); ?>";
+                }
+
+                if (substr($filePath, -4) == '.css') {
+                    return "<?php Assets::echoCss({$parameter}); ?>";
+                }
+
+                return "<?php if(! Assets::isLoaded('".$cleanParameter."')) { Assets::markAsLoaded('".$cleanParameter."');  ?>";
+            });
+
+            $bladeCompiler->directive('endLoadOnce', function () {
+                return '<?php } ?>';
+            });
+        });
     }
 
     public function registerMiddlewareGroup(Router $router)
@@ -297,6 +339,6 @@ class BackpackServiceProvider extends ServiceProvider
      */
     public function provides()
     {
-        return ['crud', 'widgets', 'BackpackViewNamespaces', 'DatabaseSchema'];
+        return ['crud', 'widgets', 'assets', 'BackpackViewNamespaces', 'DatabaseSchema'];
     }
 }

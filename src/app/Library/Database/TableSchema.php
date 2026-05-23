@@ -4,7 +4,7 @@ namespace Backpack\CRUD\app\Library\Database;
 
 class TableSchema
 {
-    /** @var Doctrine\DBAL\Schema\Table */
+    /** @var array */
     public $schema;
 
     public function __construct(string $connection, string $table)
@@ -19,11 +19,7 @@ class TableSchema
      */
     public function getColumnsNames()
     {
-        return array_values(
-            array_map(function ($item) {
-                return $item->getName();
-            }, $this->getColumns())
-        );
+        return array_column($this->getColumns(), 'name');
     }
 
     /**
@@ -34,13 +30,13 @@ class TableSchema
      */
     public function getColumnType(string $columnName)
     {
-        if (! $this->schemaExists() || ! $this->schema->hasColumn($columnName)) {
+        if (! $this->schemaExists() || ! $this->hasColumn($columnName)) {
             return 'varchar';
         }
 
-        $column = $this->schema->getColumn($columnName);
+        $column = $this->getColumn($columnName);
 
-        return $column->getType()->getName();
+        return $column['type_name'];
     }
 
     /**
@@ -55,7 +51,7 @@ class TableSchema
             return false;
         }
 
-        return $this->schema->hasColumn($columnName);
+        return $this->getColumn($columnName) !== null;
     }
 
     /**
@@ -70,9 +66,9 @@ class TableSchema
             return true;
         }
 
-        $column = $this->schema->getColumn($columnName);
+        $column = $this->getColumn($columnName);
 
-        return $column->getNotnull() ? false : true;
+        return $column['nullable'];
     }
 
     /**
@@ -87,9 +83,9 @@ class TableSchema
             return false;
         }
 
-        $column = $this->schema->getColumn($columnName);
+        $column = $this->getColumn($columnName);
 
-        return $column->getDefault() !== null ? true : false;
+        return $column['default'] !== null ? true : false;
     }
 
     /**
@@ -104,9 +100,9 @@ class TableSchema
             return false;
         }
 
-        $column = $this->schema->getColumn($columnName);
+        $column = $this->getColumn($columnName);
 
-        return $column->getDefault();
+        return $column['default'];
     }
 
     /**
@@ -120,7 +116,25 @@ class TableSchema
             return [];
         }
 
-        return $this->schema->getColumns();
+        return array_map(function ($column) {
+            return $this->normalizeColumn($column);
+        }, $this->schema['columns'] ?? []);
+    }
+
+    /**
+     * Get the table schema indexes.
+     *
+     * @return array
+     */
+    public function getIndexes()
+    {
+        if (! $this->schemaExists()) {
+            return [];
+        }
+
+        return array_map(function ($index) {
+            return $this->normalizeIndex($index);
+        }, $this->schema['indexes'] ?? []);
     }
 
     /**
@@ -135,7 +149,87 @@ class TableSchema
             return false;
         }
 
-        return $this->schema->hasColumn($columnName);
+        return $this->hasColumn($columnName);
+    }
+
+    private function getColumn($columnName)
+    {
+        foreach ($this->getColumns() as $column) {
+            if (strtolower($column['name']) === strtolower($columnName)) {
+                return $column;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeColumn($column)
+    {
+        if (is_array($column)) {
+            $typeName = $column['type_name'] ?? strtok($column['type'] ?? '', '(') ?: 'varchar';
+
+            return [
+                'name' => $column['name'],
+                'type_name' => $this->normalizeTypeName($typeName),
+                'type' => $column['type'] ?? $typeName,
+                'nullable' => $column['nullable'] ?? true,
+                'default' => $this->normalizeDefault($column['default'] ?? null),
+            ];
+        }
+
+        $typeName = $column->getType()->getName();
+
+        return [
+            'name' => $column->getName(),
+            'type_name' => $this->normalizeTypeName($typeName),
+            'type' => $typeName,
+            'nullable' => ! $column->getNotnull(),
+            'default' => $this->normalizeDefault($column->getDefault()),
+        ];
+    }
+
+    private function normalizeIndex($index)
+    {
+        if (is_array($index)) {
+            return [
+                'name' => $index['name'] ?? null,
+                'columns' => $index['columns'] ?? [],
+                'primary' => $index['primary'] ?? false,
+                'unique' => $index['unique'] ?? false,
+            ];
+        }
+
+        return [
+            'name' => $index->getName(),
+            'columns' => $index->getColumns(),
+            'primary' => $index->isPrimary(),
+            'unique' => $index->isUnique(),
+        ];
+    }
+
+    private function normalizeTypeName($typeName)
+    {
+        $typeMap = [
+            'bigint' => 'integer',
+            'double' => 'float',
+            'jsonb' => 'json',
+            'numeric' => 'decimal',
+            'tinyint' => 'boolean',
+            'varchar' => 'string',
+        ];
+
+        return $typeMap[$typeName] ?? $typeName;
+    }
+
+    private function normalizeDefault($default)
+    {
+        if (! is_string($default)) {
+            return $default;
+        }
+
+        $default = trim($default, "'");
+
+        return is_numeric($default) ? $default + 0 : $default;
     }
 
     /**

@@ -55,9 +55,9 @@ trait AutoSet
         }
 
         foreach ($this->getDbTableColumns() as $key => $column) {
-            $column_type = $column->getType()->getName();
-            $dbColumnTypes[$column->getName()]['type'] = trim(preg_replace('/\(\d+\)(.*)/i', '', $column_type));
-            $dbColumnTypes[$column->getName()]['default'] = $column->getDefault();
+            $column_type = $column['type_name'];
+            $dbColumnTypes[$column['name']]['type'] = trim(preg_replace('/\(\d+\)(.*)/i', '', $column_type));
+            $dbColumnTypes[$column['name']]['default'] = $column['default'];
         }
 
         $this->autoset['db_column_types'] = $dbColumnTypes;

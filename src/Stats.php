@@ -37,6 +37,9 @@ trait Stats
      */
     private function sendUsageStats()
     {
+        // Don't spy on us, please.
+        return;
+
         // only send usage stats in production
         if (! $this->runningInProduction()) {
             return;

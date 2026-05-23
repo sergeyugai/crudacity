@@ -27,8 +27,8 @@ trait HasRelationshipFields
             'jsonb' => 'json',
         ];
 
-        // only register the extra types in sql databases
-        if (self::isSqlConnection()) {
+        // only register the extra types in sql databases where Laravel still exposes Doctrine
+        if (self::isSqlConnection() && method_exists($connection, 'getDoctrineSchemaManager')) {
             $platform = $connection->getDoctrineSchemaManager()->getDatabasePlatform();
             foreach ($types as $type_key => $type_value) {
                 if (! $platform->hasDoctrineTypeMappingFor($type_key)) {
@@ -120,7 +120,7 @@ trait HasRelationshipFields
     {
         $instance = new static();
         $conn = $instance->getConnectionWithExtraTypeMappings();
-        $table = $instance->getTableWithPrefix();
+        $table = $instance->getTable();
 
         return [$conn, $table];
     }

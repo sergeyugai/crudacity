@@ -33,11 +33,10 @@ trait HasIdentifiableAttribute
     private static function guessIdentifiableColumnName()
     {
         $instance = new static();
-        $conn = $instance->getConnectionWithExtraTypeMappings();
-        $table = $instance->getTableWithPrefix();
-        $columns = $conn->getDoctrineSchemaManager()->listTableColumns($table);
-        $indexes = $conn->getDoctrineSchemaManager()->listTableIndexes($table);
-        $columnsNames = array_keys($columns);
+        $table = $instance::getDbTableSchema();
+        $columns = $table->getColumns();
+        $indexes = $table->getIndexes();
+        $columnsNames = array_column($columns, 'name');
 
         // these column names are sensible defaults for lots of use cases
         $sensibleDefaultNames = ['name', 'title', 'description', 'label'];
@@ -53,16 +52,15 @@ trait HasIdentifiableAttribute
         // get indexed columns in database table
         $indexedColumns = [];
         foreach ($indexes as $index) {
-            $indexColumns = $index->getColumns();
-            foreach ($indexColumns as $ic) {
-                array_push($indexedColumns, $ic);
-            }
+            $indexedColumns = array_merge($indexedColumns, $index['columns']);
         }
 
         // if none of the sensible defaults exists
         // we get the first column from database
         // that is NOT indexed (usually primary, foreign keys)
-        foreach ($columns as $columnName => $columnProperties) {
+        foreach ($columns as $columnProperties) {
+            $columnName = $columnProperties['name'];
+
             if (! in_array($columnName, $indexedColumns)) {
                 //check for convention "field<_id>" in case developer didn't add foreign key constraints.
                 if (strpos($columnName, '_id') !== false) {

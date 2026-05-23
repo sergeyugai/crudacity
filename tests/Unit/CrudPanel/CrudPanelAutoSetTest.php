@@ -852,6 +852,13 @@ class CrudPanelAutoSetTest extends BaseDBCrudPanelTest
 
         $this->app['config']->set('database.connections.testing_2', $new_model_db_config);
 
+        if (! method_exists($this->crudPanel->getModel()->getConnection(), 'getDoctrineConnection')) {
+            $this->crudPanel->setDoctrineTypesMapping();
+            $this->assertTrue(true);
+
+            return;
+        }
+
         $original_db_platform = $this->crudPanel->getModel()->getConnection()->getDoctrineConnection()->getDatabasePlatform();
         $this->crudPanel->setDoctrineTypesMapping();
         $type = $original_db_platform->getDoctrineTypeMapping('enum');

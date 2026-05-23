@@ -11,7 +11,7 @@
 >
     <testsuites>
         <testsuite name="Package Test Suite">
-            <directory suffix=".php">./tests/</directory>
+            <directory suffix="Test.php">./tests/</directory>
             <file phpVersion="8.1.0" phpVersionOperator=">=">./tests81/Unit/CrudPanel/CrudPanelUpdateTest.php</file>
             <file phpVersion="8.1.0" phpVersionOperator=">=">./tests81/Unit/CrudPanel/CrudPanelFieldsTest.php</file>
         </testsuite>

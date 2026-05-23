@@ -3,7 +3,6 @@
 namespace Backpack\CRUD\app\Library\Database;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\LazyCollection;
 
 final class DatabaseSchema
 {
@@ -33,26 +32,37 @@ final class DatabaseSchema
     private static function generateDatabaseSchema(string $connection, string $table)
     {
         if (! isset(self::$schema[$connection])) {
-            $rawTables = DB::connection($connection)->getDoctrineSchemaManager()->createSchema();
-            self::$schema[$connection] = self::mapTables($rawTables);
+            self::$schema[$connection] = [];
         } else {
             // check for a specific table in case it was created after schema had been generated.
             if (! isset(self::$schema[$connection][$table])) {
-                self::$schema[$connection][$table] = DB::connection($connection)->getDoctrineSchemaManager()->listTableDetails($table);
+                self::$schema[$connection][$table] = self::readTableSchema($connection, $table);
             }
+        }
+
+        if (! isset(self::$schema[$connection][$table])) {
+            self::$schema[$connection][$table] = self::readTableSchema($connection, $table);
         }
     }
 
-    /**
-     * Map the tables from raw db values into an usable array.
-     *
-     * @param  Doctrine\DBAL\Schema\Schema  $rawTables
-     * @return array
-     */
-    private static function mapTables($rawTables)
+    private static function readTableSchema(string $connectionName, string $table)
     {
-        return LazyCollection::make($rawTables->getTables())->mapWithKeys(function ($table, $key) {
-            return [$table->getName() => $table];
-        })->toArray();
+        $connection = DB::connection($connectionName);
+        $schema = $connection->getSchemaBuilder();
+
+        if (method_exists($schema, 'getColumns')) {
+            return [
+                'columns' => $schema->getColumns($table),
+                'indexes' => method_exists($schema, 'getIndexes') ? $schema->getIndexes($table) : [],
+            ];
+        }
+
+        $prefixedTable = $connection->getTablePrefix().$table;
+        $schemaManager = $connection->getDoctrineSchemaManager();
+
+        return [
+            'columns' => $schemaManager->listTableColumns($prefixedTable),
+            'indexes' => $schemaManager->listTableIndexes($prefixedTable),
+        ];
     }
 }
